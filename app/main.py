@@ -14,48 +14,103 @@ from app.utils.ultramsg_client import enviar_mensagem
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-_digits_re = re.compile(r"\D")
+_digits_re = re.compile(r"\D+")
 
-# Armazenar o estado do usuário em memória por telefone
-estados_usuarios = {}
+def _only_digits(s: str) -> str:
+    return _digits_re.sub("", s or "")
+
+def _extrair_telefone(raw_chat_id: Optional[str], raw_from: Optional[str]) -> Optional[str]:
+    """Extrai o número do formato UltraMsg (ex: '558199999999@c.us')."""
+    val = raw_chat_id or raw_from
+    if not val:
+        return None
+    num = val.split("@")[0]
+    return _only_digits(num)
+
+def _detectar_nome(texto: str) -> Optional[str]:
+    """Detecta nome presumido se tiver estrutura típica (ex: 'meu nome é João Silva')."""
+    texto = texto.lower()
+    match = re.search(r"(?:meu nome é|sou o|sou a|aqui é o|aqui é a)\s+([a-zA-ZÀ-ÿ\s]{3,})", texto)
+    if match:
+        nome = match.group(1).strip().title()
+        return nome
+    return None
+
+def _detectar_cpf(texto: str) -> Optional[str]:
+    if not texto:
+        return None
+    m = re.search(r"(\d{3}\.?\d{3}\.?\d{3}-?\d{2})", texto)
+    if m:
+        return m.group(1)
+    return None
 
 @app.post("/")
 async def webhook_ultramsg(req: Request):
     body = await req.json()
-    logging.info(f"Body recebido: {body}")
+    if DEBUG:
+        logging.info(f"Payload recebido: {body}")
 
-    if body.get("type") != "message":
-        return {"status": "ignorado"}
+    if body.get("event_type") != "message_received":
+        return {"status": "ignorado", "motivo": "evento não é message_received"}
 
-    telefone = body.get("from")
-    mensagem = body.get("body", "").strip()
-    estado = estados_usuarios.get(telefone)
+    data = body.get("data", {})
+    tipo = data.get("type")
 
-    cliente = await buscar_cliente_por_telefone(telefone)
+    if tipo != "chat":
+        return {"status": "ignorado", "motivo": f"evento {tipo}"}
+
+    texto_cli = data.get("body", "")
+    chat_id   = data.get("chatId")
+    from_id   = data.get("from")
+    pushname  = data.get("pushname", "")
+
+    telefone  = _extrair_telefone(chat_id, from_id)
+    if not telefone:
+        logging.error("Sem telefone no payload.")
+        return {"status": "erro", "detail": "sem telefone"}
+
+    cliente = buscar_cliente_por_telefone(telefone)
+
+    contexto = None
+    cpf = _detectar_cpf(texto_cli)  # detecta CPF só 1 vez
+    nome_detectado = _detectar_nome(texto_cli)
 
     if cliente:
-        resposta = await gerar_resposta_nordestina(mensagem, cliente)
+        contexto = f"Cliente identificado: nome={cliente['nome']} CPF={cliente['cpf']}."
+    elif cpf:
+        c2 = buscar_cliente_por_cpf(cpf)
+        if c2:
+            cliente = c2
+            contexto = f"Cliente identificado por CPF: nome={c2['nome']} CPF={c2['cpf']}."
+            try:
+                salvar_novo_cliente(telefone, cpf, nome=pushname)
+                logging.info("Cliente salvo no banco com nome do WhatsApp.")
+            except Exception as e:
+                logging.exception("Erro ao salvar cliente novo: %s", e)
     else:
-        if not estado:
-            resposta = "Ôxente! Qual o seu nome pra eu lhe cadastrar, meu rei?"
-            estados_usuarios[telefone] = {"fase": "nome"}
-        elif estado["fase"] == "nome":
-            estados_usuarios[telefone]["nome"] = mensagem
-            estados_usuarios[telefone]["fase"] = "cpf"
-            resposta = "Beleza! Agora me diga seu CPF, só os números."
-        elif estado["fase"] == "cpf":
-            cpf_limpo = _digits_re.sub("", mensagem)
-            if len(cpf_limpo) != 11:
-                resposta = "Eita! Esse CPF tá estranho... Manda de novo, por favor, só com os números."
-            else:
-                nome = estado["nome"]
-                await salvar_novo_cliente(nome=nome, telefone=telefone, cpf=cpf_limpo)
-                resposta = f"Pronto, {nome}! Cadastro feito com sucesso. Pode falar o que quiser agora! 😄"
-                estados_usuarios.pop(telefone, None)
+        if cpf and nome_detectado:
+            try:
+                salvar_novo_cliente(telefone, cpf, nome=nome_detectado)
+                contexto = f"Novo cliente cadastrado com sucesso: nome={nome_detectado}, CPF={cpf}."
+                cliente = {"nome": nome_detectado, "cpf": cpf}
+            except Exception as e:
+                logging.exception("Erro ao cadastrar novo cliente com nome e CPF: %s", e)
+                contexto = (
+                    "Tentei cadastrar, mas houve um erro. Por favor, informe novamente seu nome e CPF."
+                )
+        else:
+            contexto = (
+                "Ainda não encontrei seu cadastro. Por favor, me informe seu nome completo e CPF "
+                "para eu fazer seu cadastro rapidinho."
+            )
 
-    if DEBUG:
-        print("Resposta:", resposta)
-    else:
+    resposta = gerar_resposta_nordestina(texto_cli, contexto)
+    logging.info(f"Resposta gerada pela LLM: {resposta}")  # log para debug da resposta
+
+    try:
         await enviar_mensagem(telefone, resposta)
+    except Exception as e:
+        logging.exception("Falha ao enviar via UltraMsg: %s", e)
+        return {"status": "erro_envio", "detail": str(e)}
 
     return {"status": "ok"}
