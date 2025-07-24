@@ -18,7 +18,7 @@ _digits_re = re.compile(r"\D")
 _nome_re = re.compile(r"(?i)\b(meu nome é|sou|me chamo)\s+([a-zà-ú\s]+)")
 
 
-@app.post("/webhook")
+@app.post("/")
 async def webhook(request: Request):
     body = await request.json()
     logging.info("Corpo recebido: %s", body)
