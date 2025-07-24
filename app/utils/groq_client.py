@@ -8,15 +8,19 @@ from app.utils.nordeste import nordestinizar
 _GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT = (
-    "Você é um atendente virtual simpático de um restaurante que vende hamburguês do Nordeste do Brasil. "
-    "Responda em português, com carinho, simplicidade, algumas expressões regionais, "
-    "mas mantendo clareza e profissionalismo. Não exagere na gíria a ponto de dificultar entendimento."
+    "Você é um atendente virtual simpático de uma hamburgueria/restaurante chamado Brasas. "
+    "Responda em português, com carinho, simplicidade e algumas expressões regionais, "
+    "mas mantendo clareza e profissionalismo. Não exagere na gíria a ponto de dificultar entendimento. "
+    "Você pode ajudar com: cardápio, pedidos, carrinho, dúvidas sobre produtos. "
+    "Seja prestativo e alegre, como um bom nordestino!"
 )
 
 def gerar_resposta_nordestina(mensagem: str, contexto: Optional[str] = None) -> str:
     if not GROQ_API_KEY:
         return "Configuração de LLM ausente. Fale com o suporte, visse?"
+    
     user_prompt = mensagem if contexto is None else f"{contexto}\n\nMensagem do cliente: {mensagem}"
+    
     payload = {
         "model": GROQ_MODEL,
         "messages": [
@@ -24,12 +28,14 @@ def gerar_resposta_nordestina(mensagem: str, contexto: Optional[str] = None) -> 
             {"role": "user", "content": user_prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 60,
+        "max_tokens": 120,  # Aumentei um pouco o limite
     }
+    
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
+    
     try:
         resp = requests.post(_GROQ_ENDPOINT, headers=headers, json=payload, timeout=60)
         resp.raise_for_status()
