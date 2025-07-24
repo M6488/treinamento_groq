@@ -50,14 +50,20 @@ async def webhook_ultramsg(req: Request):
     if DEBUG:
         logging.info(f"Payload recebido: {body}")
 
-    tipo = body.get("type")
+    # Verifica se é uma mensagem recebida
+    if body.get("event_type") != "message_received":
+        return {"status": "ignorado", "motivo": "evento não é message_received"}
+
+    data = body.get("data", {})
+    tipo = data.get("type")
+
     if tipo != "chat":
         return {"status": "ignorado", "motivo": f"evento {tipo}"}
 
-    texto_cli = body.get("body", "")
-    chat_id   = body.get("chatId")
-    from_id   = body.get("from")
-    pushname  = body.get("pushname", "")  # Nome do WhatsApp
+    texto_cli = data.get("body", "")
+    chat_id   = data.get("chatId")
+    from_id   = data.get("from")
+    pushname  = data.get("pushname", "")
 
     telefone  = _extrair_telefone(chat_id, from_id)
     if not telefone:
@@ -77,7 +83,6 @@ async def webhook_ultramsg(req: Request):
                 cliente = c2
                 contexto = f"Cliente identificado por CPF: nome={c2['nome']} CPF={c2['cpf']}."
                 try:
-                    
                     salvar_novo_cliente(telefone, cpf, nome=pushname)
                     logging.info("Cliente salvo no banco com nome do WhatsApp.")
                 except Exception as e:
@@ -85,7 +90,6 @@ async def webhook_ultramsg(req: Request):
         if not cliente:
             cpf = _detectar_cpf(texto_cli)
             nome_detectado = _detectar_nome(texto_cli)
-
             if cpf and nome_detectado:
                 try:
                     salvar_novo_cliente(telefone, cpf, nome=nome_detectado)
@@ -111,5 +115,4 @@ async def webhook_ultramsg(req: Request):
         return {"status": "erro_envio", "detail": str(e)}
 
     return {"status": "ok"}
-
     
