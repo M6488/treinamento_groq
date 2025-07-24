@@ -38,3 +38,14 @@ def buscar_cliente_por_cpf(cpf: str) -> Optional[Dict]:
         """, (num,))
         row = cur.fetchone()
         return row
+
+def salvar_novo_cliente(telefone: str, cpf: str, nome: Optional[str] = None):
+    telefone_digits = _only_digits(telefone)
+    cpf_digits = _only_digits(cpf)
+
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO clientes (telefone, cpf, nome)
+            VALUES (%s, %s, %s)
+        """, (telefone_digits, cpf_digits, nome or ''))
+        conn.commit()
