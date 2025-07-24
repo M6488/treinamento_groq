@@ -1,6 +1,6 @@
 import os
 
-ULTRAMSG_INSTANCE_ID = os.getenv("ULTRAMSG_INSTANCE_ID", "").strip()
+ULTRAMSG_INSTANCE_ID = os.getenv("ULTRAMSG_INSTANCE_ID", "instance134752").strip()
 ULTRAMSG_TOKEN       = os.getenv("ULTRAMSG_TOKEN", "").strip()
 ULTRAMSG_BASE_URL    = os.getenv("ULTRAMSG_BASE_URL", "https://api.ultramsg.com").rstrip("/")
 GROQ_API_KEY         = os.getenv("GROQ_API_KEY", "").strip()
