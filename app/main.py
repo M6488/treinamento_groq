@@ -50,7 +50,6 @@ async def webhook_ultramsg(req: Request):
     if DEBUG:
         logging.info(f"Payload recebido: {body}")
 
-    # Verifica se é uma mensagem recebida
     if body.get("event_type") != "message_received":
         return {"status": "ignorado", "motivo": "evento não é message_received"}
 
@@ -73,40 +72,40 @@ async def webhook_ultramsg(req: Request):
     cliente = buscar_cliente_por_telefone(telefone)
 
     contexto = None
+    cpf = _detectar_cpf(texto_cli)  # detecta CPF só 1 vez
+    nome_detectado = _detectar_nome(texto_cli)
+
     if cliente:
         contexto = f"Cliente identificado: nome={cliente['nome']} CPF={cliente['cpf']}."
+    elif cpf:
+        c2 = buscar_cliente_por_cpf(cpf)
+        if c2:
+            cliente = c2
+            contexto = f"Cliente identificado por CPF: nome={c2['nome']} CPF={c2['cpf']}."
+            try:
+                salvar_novo_cliente(telefone, cpf, nome=pushname)
+                logging.info("Cliente salvo no banco com nome do WhatsApp.")
+            except Exception as e:
+                logging.exception("Erro ao salvar cliente novo: %s", e)
     else:
-        cpf = _detectar_cpf(texto_cli)
-        if cpf:
-            c2 = buscar_cliente_por_cpf(cpf)
-            if c2:
-                cliente = c2
-                contexto = f"Cliente identificado por CPF: nome={c2['nome']} CPF={c2['cpf']}."
-                try:
-                    salvar_novo_cliente(telefone, cpf, nome=pushname)
-                    logging.info("Cliente salvo no banco com nome do WhatsApp.")
-                except Exception as e:
-                    logging.exception("Erro ao salvar cliente novo: %s", e)
-        if not cliente:
-            cpf = _detectar_cpf(texto_cli)
-            nome_detectado = _detectar_nome(texto_cli)
-            if cpf and nome_detectado:
-                try:
-                    salvar_novo_cliente(telefone, cpf, nome=nome_detectado)
-                    contexto = f"Novo cliente cadastrado com sucesso: nome={nome_detectado}, CPF={cpf}."
-                    cliente = {"nome": nome_detectado, "cpf": cpf}
-                except Exception as e:
-                    logging.exception("Erro ao cadastrar novo cliente com nome e CPF: %s", e)
-                    contexto = (
-                        "Tentei cadastrar, mas houve um erro. Por favor, informe novamente seu nome e CPF."
-                    )
-            else:
+        if cpf and nome_detectado:
+            try:
+                salvar_novo_cliente(telefone, cpf, nome=nome_detectado)
+                contexto = f"Novo cliente cadastrado com sucesso: nome={nome_detectado}, CPF={cpf}."
+                cliente = {"nome": nome_detectado, "cpf": cpf}
+            except Exception as e:
+                logging.exception("Erro ao cadastrar novo cliente com nome e CPF: %s", e)
                 contexto = (
-                    "Ainda não encontrei seu cadastro. Por favor, me informe seu nome completo e CPF "
-                    "para eu fazer seu cadastro rapidinho."
+                    "Tentei cadastrar, mas houve um erro. Por favor, informe novamente seu nome e CPF."
                 )
+        else:
+            contexto = (
+                "Ainda não encontrei seu cadastro. Por favor, me informe seu nome completo e CPF "
+                "para eu fazer seu cadastro rapidinho."
+            )
 
     resposta = gerar_resposta_nordestina(texto_cli, contexto)
+    logging.info(f"Resposta gerada pela LLM: {resposta}")  # log para debug da resposta
 
     try:
         await enviar_mensagem(telefone, resposta)
@@ -115,4 +114,3 @@ async def webhook_ultramsg(req: Request):
         return {"status": "erro_envio", "detail": str(e)}
 
     return {"status": "ok"}
-    
