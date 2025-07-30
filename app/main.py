@@ -20,12 +20,10 @@ from app.utils.ultramsg_client import enviar_mensagem
 
 app = FastAPI(title="WhatsApp Bot Hamburgueria", version="1.0.0")
 
-# Log de inicialização
 logger.info("🚀 Aplicação iniciada!")
 logger.info(f"🔧 Debug mode: {DEBUG}")
 logger.info(f"🖥️ Python version: {sys.version}")
 
-# Suas funções auxiliares aqui...
 def _only_digits(s: str) -> str:
     import re
     return re.sub(r"\D+", "", s or "")
@@ -122,7 +120,6 @@ async def test_database():
 @app.post("/")
 async def webhook_ultramsg(req: Request):
     try:
-        # Log inicial
         logger.info("📨 Webhook chamado!")
         
         body = await req.json()
@@ -153,13 +150,11 @@ async def webhook_ultramsg(req: Request):
 
         logger.info(f"📱 Telefone extraído: {telefone}")
 
-        # Busca cliente existente
         cliente = buscar_cliente_por_telefone(telefone)
         logger.info(f"👤 Cliente encontrado: {cliente is not None}")
 
         contexto = None
 
-        # Se cliente não existe, verifica se forneceu nome
         if not cliente:
             logger.info("🆕 Cliente novo, verificando nome...")
             nome_detectado = _detectar_nome(texto_cli)
@@ -179,12 +174,10 @@ async def webhook_ultramsg(req: Request):
                 logger.info("❓ Nome não detectado, pedindo para cliente se identificar")
                 contexto = "Oi, meu rei! Pra eu te atender melhor, me diga seu nome completo, por favor."
 
-        # Cliente identificado - processar comandos
         if cliente:
             nome_cliente = cliente.get('nome', 'meu rei')
             logger.info(f"🎯 Processando comandos para cliente: {nome_cliente}")
             
-            # Comando: Ver cardápio
             if _detectar_comando_cardapio(texto_cli):
                 logger.info("📋 Comando: mostrar cardápio")
                 cardapio = buscar_cardapio_ativo()
@@ -198,8 +191,7 @@ async def webhook_ultramsg(req: Request):
                 except Exception as e:
                     logger.exception(f"❌ Erro ao enviar cardápio: {e}")
                     return {"status": "erro_envio", "detail": str(e)}
-            
-            # Comando: Adicionar ao carrinho
+
             produto_desejado = _detectar_adicionar_carrinho(texto_cli)
             if produto_desejado:
                 logger.info(f"🛒 Comando: adicionar produto '{produto_desejado}'")
@@ -207,7 +199,7 @@ async def webhook_ultramsg(req: Request):
                 
                 if produto:
                     logger.info(f"✅ Produto encontrado: {produto['nome']}")
-                    # Busca ou cria carrinho
+
                     carrinho = buscar_carrinho_aberto(cliente['id'])
                     if not carrinho:
                         carrinho_id = criar_carrinho(cliente['id'])
@@ -216,13 +208,12 @@ async def webhook_ultramsg(req: Request):
                         carrinho_id = str(carrinho['id'])
                         logger.info(f"📦 Usando carrinho existente: {carrinho_id}")
                     
-                    # Adiciona produto
                     try:
                         adicionar_item_carrinho(carrinho_id, produto['id'])
                         preco_reais = produto['preco_centavos'] / 100
                         resposta = f"Oxente! Coloquei *{produto['nome']}* (R$ {preco_reais:.2f}) no teu carrinho!"
                         
-                        # Mostra carrinho atualizado
+                        #aqui o carrinho atualizado
                         itens = listar_itens_carrinho(carrinho_id)
                         resposta += "\n\n" + _formatar_carrinho(itens)
                         logger.info("✅ Produto adicionado ao carrinho")
@@ -242,7 +233,7 @@ async def webhook_ultramsg(req: Request):
                     logger.exception(f"❌ Erro ao enviar resposta do carrinho: {e}")
                     return {"status": "erro_envio", "detail": str(e)}
             
-            # Comando: Ver carrinho
+            
             if any(palavra in texto_cli.lower() for palavra in ['carrinho', 'pedido', 'meu pedido']):
                 logger.info("👀 Comando: ver carrinho")
                 carrinho = buscar_carrinho_aberto(cliente['id'])
@@ -262,10 +253,10 @@ async def webhook_ultramsg(req: Request):
                     logger.exception(f"❌ Erro ao enviar carrinho: {e}")
                     return {"status": "erro_envio", "detail": str(e)}
             
-            # Contexto para IA
+            
             contexto = f"Cliente: {nome_cliente}. Responda como atendente simpático de hamburgueria."
 
-        # Gera resposta via IA
+        #respostas do modelo do groq
         logger.info("🤖 Gerando resposta via IA...")
         resposta = gerar_resposta_nordestina(texto_cli, contexto)
         logger.info(f"💭 Resposta gerada: {resposta}")

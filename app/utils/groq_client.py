@@ -1,4 +1,3 @@
-"""Cliente Groq para gerar respostas com sotaque nordestino."""
 import os
 import requests
 from typing import Optional
@@ -28,7 +27,7 @@ def gerar_resposta_nordestina(mensagem: str, contexto: Optional[str] = None) -> 
             {"role": "user", "content": user_prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 120,  # Aumentei um pouco o limite
+        "max_tokens": 135,
     }
     
     headers = {

@@ -11,15 +11,14 @@ DATABASE_URL         = os.getenv("DATABASE_URL", "").strip()
 DEBUG                = os.getenv("DEBUG", "false").lower() in ("1","true","yes","y")
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-RENDER_ENV = os.getenv("RENDER", False)  # Render define essa variável automaticamente
+RENDER_ENV = os.getenv("RENDER", False)
 
-# Configuração específica para Render
 if RENDER_ENV:
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.StreamHandler()  # Força saída para stdout
+            logging.StreamHandler()
         ]
     )
 else:
