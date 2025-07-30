@@ -3,6 +3,7 @@ import logging
 import sys
 from typing import Optional
 import traceback
+import os
 
 from app.config import DEBUG, logger
 from app.utils.db import (
