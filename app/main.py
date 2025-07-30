@@ -256,7 +256,6 @@ async def webhook_ultramsg(req: Request):
             
             contexto = f"Cliente: {nome_cliente}. Responda como atendente simpático de hamburgueria."
 
-        #respostas do modelo do groq
         logger.info("🤖 Gerando resposta via IA...")
         resposta = gerar_resposta_nordestina(texto_cli, contexto)
         logger.info(f"💭 Resposta gerada: {resposta}")
