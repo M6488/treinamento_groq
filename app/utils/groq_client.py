@@ -4,7 +4,7 @@ from typing import Optional
 from app.config import GROQ_API_KEY, GROQ_MODEL
 from app.utils.nordeste import nordestinizar
 
-_GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
+_GROQ_ENDPOINT =  "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT = (
     "Você é um atendente virtual simpático de uma hamburgueria/restaurante chamado Brasas. "
